@@ -1,6 +1,8 @@
+from datetime import datetime
 from enum import Enum
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, Path, HTTPException
 from pydantic import BaseModel
+from typing import List
 
 app = FastAPI()
 
@@ -38,26 +40,39 @@ post_db = [
 ]
 
 
-@app.get('/')
+@app.get("/", summary="Root", response_description="Successful Response")
 def root():
-    # ваш код здесь
-    ...
+    return {"message": "Hello, this is my first API"}
 
-# ваш код здесь
-...
+@app.post("/post", summary="Get Post", response_description="Successful Response")
+def get_post(new_timestamp: Timestamp):
+    new_timestamp = Timestamp(timestamp=datetime.now())
+    return Timestamp(id=new_timestamp.id,
+                     timestamp=int(round(new_timestamp.timestamp.timestamp())))
 
-@app.get("/")
-def root():
-    return "Hello"
+@app.get("/dog", summary="Get Dogs", response_description="Successful Response", response_model=Dog)
+def get_dogs(kind: DogType = Query(None, description="Dogs filter bu kind")):
+    if kind:
+        return [dog for dog in dogs_db.values() if dog.kind == kind]
+    return list(dogs_db.values())
 
-@app.get("/add")
-def add(x: int, y: int) -> int:
-    return x + y
+@app.post("/dog", summary="Create Dogs", response_description="Successful Response", response_model=Dog)
+def create_dogs(dog: Dog):
+    dog.pk = max(dogs_db.keys()) + 1
+    dogs_db[dog.pk] = dog
+    return dog
 
-@app.get("/welcome/{name}")
-def add(name: str) -> str:
-    return f"Good luck, {name}!"
+@app.get("/dog/{pk}", summary="Get Dog By Pk", response_description="Successful Response", response_model=Dog)
+def get_dog_by_pk(pk: int = Path(..., title="Pk", description="Pk of the dog")):
+    if pk not in dogs_db:
+        raise HTTPException(status_code=404, detail="Dog not found")
+    return dogs_db[pk]
 
-@app.get("/phone/{number}")
-def phone_number(number):
-    return ("phone": number)
+@app.patch("/dog/{pk}", summary="Update Dog", response_description="Successful Response", response_model=Dog)
+def update_dog(pk: int = Path(..., title="Pk", description="Pk of the dog"), updated_dog: Dog):
+    dog = dogs_db.get(pk)
+    if dog is None:
+        raise HTTPException(status_code=404, detail="Dog not found")
+    dog.name = updated_dog.name
+    dog.kind = updated_dog.kind
+    return dog
